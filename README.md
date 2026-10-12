@@ -4,11 +4,13 @@ An AI-style mock interview simulator designed with the restraint, typography, an
 
 Pure client-side execution using HTML5, CSS3, Vanilla JavaScript (ES6+), and GSAP. Zero frameworks, no page reloads, and zero telemetry.
 
+🔗 **Live Deployment**: **[https://firstlight-io.github.io/pract/](https://firstlight-io.github.io/pract/)**
+
 ---
 
 ## ✨ Features
 
-- **Linear-Tier Aesthetic**: Specular lighting, deep charcoal obsidian palette (`#09090b`), tight typography with `Inter` and `IBM Plex Mono`.
+- **Linear-Tier Aesthetic**: Specular lighting, pitch-black obsidian palette (`#040406`), tight typography with `Inter` and `IBM Plex Mono`.
 - **Keyboard-First Navigation**:
   - <kbd>1</kbd>–<kbd>4</kbd> to launch interview tracks from the home screen
   - <kbd>⌘</kbd>+<kbd>↵</kbd> or <kbd>Ctrl</kbd>+<kbd>↵</kbd> to submit answers
@@ -28,7 +30,7 @@ Pure client-side execution using HTML5, CSS3, Vanilla JavaScript (ES6+), and GSA
 
 ## 🚀 Getting Started
 
-No build step or dependencies required. Open `index.html` in any modern web browser or serve it with Python:
+Visit the live app at **[https://firstlight-io.github.io/pract/](https://firstlight-io.github.io/pract/)** or run it locally without dependencies:
 
 ```bash
 # Clone the repository
