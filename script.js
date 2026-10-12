@@ -166,7 +166,8 @@ const S = {
   remaining: 120,
   results: [],
   currentView: 'vSelect',
-  isModalOpen: false
+  isModalOpen: false,
+  matchedKeywordsSet: new Set()
 };
 
 /* ============================================================================
@@ -193,6 +194,7 @@ const D = {
 
   // Interview stage
   ivCat: el('ivCat'),
+  audioWave: el('audioWave'),
   ivNum: el('ivNum'),
   ivTotal: el('ivTotal'),
   timerPill: el('timerPill'),
@@ -200,6 +202,8 @@ const D = {
   timerBar: el('timerBar'),
   ivQ: el('ivQ'),
   answerBox: el('answerBox'),
+  radarCount: el('radarCount'),
+  radarChipsList: el('radarChipsList'),
   metaWords: el('metaWords'),
   metaFillers: el('metaFillers'),
   metaChars: el('metaChars'),
@@ -250,7 +254,7 @@ const D = {
 };
 
 /* ============================================================================
- * VIEW TRANSITIONS (GSAP)
+ * GSAP VIEW ROUTER & TRANSITIONS
  * ============================================================================ */
 
 const VIEWS = [D.vSelect, D.vInterview, D.vFeedback, D.vSummary];
@@ -263,7 +267,7 @@ function show(targetViewEl) {
     tl.to(currentEl, {
       opacity: 0,
       y: -6,
-      duration: 0.15,
+      duration: 0.16,
       ease: 'power2.in',
       onComplete() {
         currentEl.classList.add('v-hidden');
@@ -274,7 +278,7 @@ function show(targetViewEl) {
 
   tl.call(() => {
     targetViewEl.classList.remove('v-hidden');
-    gsap.set(targetViewEl, { opacity: 0, y: 8 });
+    gsap.set(targetViewEl, { opacity: 0, y: 10 });
     window.scrollTo({ top: 0, behavior: 'smooth' });
     updateNavigationChrome();
   });
@@ -282,7 +286,7 @@ function show(targetViewEl) {
   tl.to(targetViewEl, {
     opacity: 1,
     y: 0,
-    duration: 0.24,
+    duration: 0.26,
     ease: 'power2.out'
   });
 }
@@ -311,6 +315,29 @@ function updateNavigationChrome() {
 }
 
 /* ============================================================================
+ * GSAP MICRO-ANIMATIONS (Waveform & Interactive Spotlight)
+ * ============================================================================ */
+
+/**
+ * Animate the live 4-bar waveform visualizer
+ */
+function pulseAudioWaveform() {
+  if (!D.audioWave) return;
+  const bars = D.audioWave.querySelectorAll('.wave-bar');
+  D.audioWave.classList.add('active');
+
+  bars.forEach((bar, idx) => {
+    gsap.to(bar, {
+      scaleY: Math.random() * 0.8 + 0.3,
+      duration: 0.15 + idx * 0.05,
+      yoyo: true,
+      repeat: 1,
+      ease: 'power1.inOut'
+    });
+  });
+}
+
+/* ============================================================================
  * TIMER ENGINE
  * ============================================================================ */
 
@@ -323,6 +350,9 @@ function startTimer(seconds) {
   S.timerId = setInterval(() => {
     S.remaining--;
     paintTimer();
+    // Subtle waveform pulse every few seconds of active time
+    if (S.remaining % 3 === 0) pulseAudioWaveform();
+
     if (S.remaining <= 0) {
       stopTimer();
       submitAnswer(true);
@@ -359,7 +389,7 @@ function paintTimer() {
 }
 
 /* ============================================================================
- * INPUT MONITORING (onkeyup)
+ * REAL-TIME INPUT MONITORING & KEYWORD RADAR
  * ============================================================================ */
 
 function getWords(text) {
@@ -384,14 +414,40 @@ function findFillers(text) {
   return out;
 }
 
+/**
+ * Initializes the keyword HUD tracker for the current question
+ */
+function initKeywordRadar(questionObj) {
+  D.radarChipsList.innerHTML = '';
+  S.matchedKeywordsSet.clear();
+
+  questionObj.expectedKeywords.forEach(kw => {
+    const chip = document.createElement('span');
+    chip.className = 'radar-chip';
+    chip.dataset.keyword = kw.toLowerCase();
+    chip.textContent = kw;
+    D.radarChipsList.appendChild(chip);
+  });
+
+  updateRadarCount(0, questionObj.expectedKeywords.length);
+}
+
+function updateRadarCount(hitCount, totalCount) {
+  D.radarCount.textContent = `${hitCount} of ${totalCount} mentioned`;
+}
+
 function handleInputKeyup(e) {
   const text = D.answerBox.value;
   const wordCount = getWords(text).length;
   const charCount = text.length;
 
+  // Pulse live waveform while typing
+  pulseAudioWaveform();
+
   D.metaWords.textContent = `${wordCount} word${wordCount === 1 ? '' : 's'}`;
   D.metaChars.textContent = `${charCount} char${charCount === 1 ? '' : 's'}`;
 
+  // Check Fillers
   const fillers = findFillers(text);
   const fillerCount = fillers.reduce((sum, item) => sum + item.count, 0);
 
@@ -403,10 +459,44 @@ function handleInputKeyup(e) {
     D.metaFillers.className = 'meta-item meta-alert';
   }
 
+  // Real-time keyword matching in Radar HUD
+  const q = S.questions[S.qi];
+  if (q) {
+    const lower = text.toLowerCase();
+    let hitCount = 0;
+
+    const chips = D.radarChipsList.querySelectorAll('.radar-chip');
+    chips.forEach(chip => {
+      const kw = chip.dataset.keyword;
+      const escaped = kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escaped}`, 'i');
+
+      if (regex.test(lower) || lower.includes(kw)) {
+        hitCount++;
+        if (!chip.classList.contains('active')) {
+          chip.classList.add('active');
+          chip.textContent = `✓ ${chip.dataset.keyword}`;
+          // Micro GSAP pop
+          gsap.fromTo(chip, { scale: 0.9 }, { scale: 1, duration: 0.25, ease: 'back.out(2)' });
+        }
+      } else {
+        if (chip.classList.contains('active')) {
+          chip.classList.remove('active');
+          chip.textContent = chip.dataset.keyword;
+        }
+      }
+    });
+
+    updateRadarCount(hitCount, q.expectedKeywords.length);
+  }
+
   // Shortcut: Cmd/Ctrl + Enter to submit
   if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
     e.preventDefault();
-    submitAnswer(false);
+    // Tactile button bounce
+    gsap.timeline()
+      .to(D.btnSubmit, { scale: 0.95, duration: 0.1 })
+      .to(D.btnSubmit, { scale: 1, duration: 0.15, onComplete: () => submitAnswer(false) });
   }
 }
 
@@ -527,7 +617,7 @@ function evaluate(q, text, timedOut) {
 }
 
 /* ============================================================================
- * RENDER: ROLES SELECTION (Modern 2x2 Grid, Zero Arrows)
+ * RENDER: ROLES SELECTION (2x2 Grid + GSAP Mouse Spotlight)
  * ============================================================================ */
 
 function renderRoles() {
@@ -537,7 +627,23 @@ function renderRoles() {
     const qCount = QUESTIONS.filter(q => q.role === r.title).length;
     const card = document.createElement('div');
     card.className = 'role-card';
-    card.onclick = () => selectRole(r.title);
+    card.dataset.index = idx;
+
+    // Mouse Spotlight Tracking
+    card.addEventListener('mousemove', e => {
+      const rect = card.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      card.style.setProperty('--mouse-x', `${x}px`);
+      card.style.setProperty('--mouse-y', `${y}px`);
+    });
+
+    card.onclick = () => {
+      // Tactile launch animation
+      gsap.timeline()
+        .to(card, { scale: 0.98, duration: 0.08 })
+        .to(card, { scale: 1, duration: 0.15, onComplete: () => selectRole(r.title) });
+    };
 
     card.innerHTML = `
       <div>
@@ -597,7 +703,6 @@ function countUp(targetEl, targetNum, duration = 0.6, suffix = '') {
 }
 
 function renderFeedback(report) {
-  // Score Ring
   const circ = 2 * Math.PI * 32; // r=32 -> ~201.06
   gsap.set(D.fbRing, { attr: { 'stroke-dashoffset': circ } });
   D.fbScoreNum.textContent = '0';
@@ -666,16 +771,28 @@ function renderFeedback(report) {
 
   show(D.vFeedback);
 
-  // Animate Ring
+  // GSAP Ring Animation
   const offset = circ * (1 - report.score / 100);
   gsap.to(D.fbRing, {
     attr: { 'stroke-dashoffset': offset },
-    duration: 0.8,
-    delay: 0.2,
+    duration: 0.85,
+    delay: 0.18,
     ease: 'power3.out'
   });
 
-  setTimeout(() => countUp(D.fbScoreNum, report.score, 0.7), 250);
+  setTimeout(() => countUp(D.fbScoreNum, report.score, 0.75), 220);
+
+  // GSAP Stagger Keyword Badges
+  gsap.from('.kw-badge', {
+    opacity: 0,
+    y: 6,
+    scale: 0.95,
+    duration: 0.25,
+    stagger: 0.03,
+    delay: 0.35,
+    ease: 'power2.out',
+    clearProps: 'all'
+  });
 }
 
 /* ============================================================================
@@ -742,7 +859,7 @@ function renderSummary() {
   gsap.to(D.sumRing, {
     attr: { 'stroke-dashoffset': offset },
     duration: 1.1,
-    delay: 0.3,
+    delay: 0.25,
     ease: 'power3.out'
   });
 
@@ -752,7 +869,18 @@ function renderSummary() {
     D.ssKw.textContent = `${totalHit}/${totalPossible}`;
     countUp(D.ssWords, avgWords, 0.7);
     countUp(D.ssFillers, totalFillers, 0.5);
-  }, 350);
+  }, 320);
+
+  // Stagger History Rows
+  gsap.from('.hist-row', {
+    opacity: 0,
+    x: -8,
+    duration: 0.25,
+    stagger: 0.05,
+    delay: 0.4,
+    ease: 'power2.out',
+    clearProps: 'all'
+  });
 }
 
 /* ============================================================================
@@ -778,14 +906,17 @@ function loadQuestion() {
   D.metaFillers.textContent = '0 fillers';
   D.metaFillers.className = 'meta-item meta-clean';
 
+  // Init Real-Time Keyword Radar HUD
+  initKeywordRadar(q);
+
   D.ivQ.textContent = q.question;
   D.ivQ.style.opacity = 0;
 
   show(D.vInterview);
 
-  gsap.to(D.ivQ, { opacity: 1, duration: 0.3, delay: 0.25, ease: 'power2.out' });
+  gsap.to(D.ivQ, { opacity: 1, duration: 0.3, delay: 0.22, ease: 'power2.out' });
 
-  setTimeout(() => D.answerBox.focus(), 350);
+  setTimeout(() => D.answerBox.focus(), 320);
   startTimer(q.time || 120);
 }
 
@@ -894,13 +1025,17 @@ function handleGlobalKeydown(e) {
     }
   }
 
-  // Track selection shortcuts 1-4 when on vSelect (unless inside input/textarea)
+  // Track selection shortcuts 1-4 when on vSelect
   if (S.currentView === 'vSelect') {
     if (['1', '2', '3', '4'].includes(e.key)) {
       const index = parseInt(e.key, 10) - 1;
-      if (ROLES[index]) {
+      const card = D.roles.querySelectorAll('.role-card')[index];
+      if (ROLES[index] && card) {
         e.preventDefault();
-        selectRole(ROLES[index].title);
+        // Tactile keypress bounce on card
+        gsap.timeline()
+          .to(card, { scale: 0.97, duration: 0.08 })
+          .to(card, { scale: 1, duration: 0.15, onComplete: () => selectRole(ROLES[index].title) });
       }
     }
   }
@@ -945,16 +1080,16 @@ document.addEventListener('DOMContentLoaded', () => {
   bindEvents();
   updateNavigationChrome();
 
-  // Clean initial entrance
+  // GSAP entrance sequence
   gsap.from('.hero-eyebrow', { opacity: 0, y: 8, duration: 0.35, ease: 'power2.out' });
-  gsap.from('.hero-headline', { opacity: 0, y: 12, duration: 0.45, delay: 0.08, ease: 'power2.out' });
-  gsap.from('.hero-subtext', { opacity: 0, y: 10, duration: 0.4, delay: 0.16, ease: 'power2.out' });
+  gsap.from('.hero-headline', { opacity: 0, y: 12, duration: 0.42, delay: 0.08, ease: 'power2.out' });
+  gsap.from('.hero-subtext', { opacity: 0, y: 10, duration: 0.38, delay: 0.15, ease: 'power2.out' });
   gsap.from('.role-card', {
     opacity: 0,
     y: 12,
-    duration: 0.35,
+    duration: 0.32,
     stagger: 0.06,
-    delay: 0.24,
+    delay: 0.22,
     ease: 'power2.out',
     clearProps: 'all'
   });
