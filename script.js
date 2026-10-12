@@ -129,10 +129,26 @@ const QUESTIONS = [
 ];
 
 const ROLES = [
-  { title: 'Software Engineer', desc: 'System design, debugging, and incident response.' },
-  { title: 'Data Analyst', desc: 'A/B testing, data pipelines, and executive storytelling.' },
-  { title: 'Product Manager', desc: 'Prioritization frameworks, metric drops, and GTM strategy.' },
-  { title: 'Marketing', desc: 'Acquisition economics, organic flywheels, and retention.' }
+  {
+    title: 'Software Engineer',
+    desc: 'System design, distributed architectures, concurrency, and production incident response.',
+    tags: ['System Design', 'Concurrency', 'CI/CD']
+  },
+  {
+    title: 'Data Analyst',
+    desc: 'A/B testing experimentation, SQL/ETL pipelines, and executive stakeholder storytelling.',
+    tags: ['Hypothesis Testing', 'SQL', 'Attribution']
+  },
+  {
+    title: 'Product Manager',
+    desc: 'Prioritization frameworks (RICE), metric triage, telemetry, and GTM strategy.',
+    tags: ['RICE Matrix', 'Telemetry', 'Roadmaps']
+  },
+  {
+    title: 'Marketing',
+    desc: 'Customer acquisition loops, CAC/LTV economics, organic flywheels, and churn retention.',
+    tags: ['CAC:LTV', 'Flywheels', 'Retention']
+  }
 ];
 
 const FILLERS = ['um', 'uh', 'like', 'actually', 'basically', 'literally', 'you know', 'sort of', 'kind of'];
@@ -160,7 +176,7 @@ const S = {
 const el = id => document.getElementById(id);
 
 const D = {
-  // Navigation & Breadcrumbs
+  // Navigation
   navHome: el('navHome'),
   breadcrumbWrap: el('breadcrumbWrap'),
   breadcrumb: el('breadcrumb'),
@@ -246,8 +262,8 @@ function show(targetViewEl) {
   if (currentEl && currentEl !== targetViewEl) {
     tl.to(currentEl, {
       opacity: 0,
-      y: -8,
-      duration: 0.16,
+      y: -6,
+      duration: 0.15,
       ease: 'power2.in',
       onComplete() {
         currentEl.classList.add('v-hidden');
@@ -258,7 +274,7 @@ function show(targetViewEl) {
 
   tl.call(() => {
     targetViewEl.classList.remove('v-hidden');
-    gsap.set(targetViewEl, { opacity: 0, y: 10 });
+    gsap.set(targetViewEl, { opacity: 0, y: 8 });
     window.scrollTo({ top: 0, behavior: 'smooth' });
     updateNavigationChrome();
   });
@@ -266,7 +282,7 @@ function show(targetViewEl) {
   tl.to(targetViewEl, {
     opacity: 1,
     y: 0,
-    duration: 0.25,
+    duration: 0.24,
     ease: 'power2.out'
   });
 }
@@ -511,7 +527,7 @@ function evaluate(q, text, timedOut) {
 }
 
 /* ============================================================================
- * RENDER: ROLES SELECTION
+ * RENDER: ROLES SELECTION (Modern 2x2 Grid, Zero Arrows)
  * ============================================================================ */
 
 function renderRoles() {
@@ -519,25 +535,29 @@ function renderRoles() {
 
   ROLES.forEach((r, idx) => {
     const qCount = QUESTIONS.filter(q => q.role === r.title).length;
-    const row = document.createElement('div');
-    row.className = 'role-row';
-    row.onclick = () => selectRole(r.title);
+    const card = document.createElement('div');
+    card.className = 'role-card';
+    card.onclick = () => selectRole(r.title);
 
-    row.innerHTML = `
-      <div class="role-info">
-        <span class="role-title">${r.title}</span>
-        <span class="role-desc">${r.desc}</span>
+    card.innerHTML = `
+      <div>
+        <div class="role-card-header">
+          <h3 class="role-card-title">${r.title}</h3>
+          <div class="role-card-badges">
+            <kbd class="kbd-subtle">${idx + 1}</kbd>
+          </div>
+        </div>
+        <p class="role-card-desc">${r.desc}</p>
       </div>
-      <div class="role-meta">
-        <span class="role-q-badge">${qCount} Qs</span>
-        <kbd class="kbd-subtle">${idx + 1}</kbd>
-        <svg class="role-arrow" width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+      <div class="role-card-footer">
+        <div class="role-card-tags">
+          ${r.tags.map(t => `<span class="card-tag">${t}</span>`).join('')}
+        </div>
+        <span class="role-q-count">${qCount} Qs</span>
       </div>
     `;
 
-    D.roles.appendChild(row);
+    D.roles.appendChild(card);
   });
 }
 
@@ -874,7 +894,7 @@ function handleGlobalKeydown(e) {
     }
   }
 
-  // Track selection shortcuts 1-4 when on vSelect
+  // Track selection shortcuts 1-4 when on vSelect (unless inside input/textarea)
   if (S.currentView === 'vSelect') {
     if (['1', '2', '3', '4'].includes(e.key)) {
       const index = parseInt(e.key, 10) - 1;
@@ -926,14 +946,15 @@ document.addEventListener('DOMContentLoaded', () => {
   updateNavigationChrome();
 
   // Clean initial entrance
-  gsap.from('.shell', { opacity: 0, duration: 0.45, ease: 'power2.out' });
-  gsap.from('.hero', { opacity: 0, y: 10, duration: 0.35, delay: 0.1, ease: 'power2.out' });
-  gsap.from('.role-row', {
+  gsap.from('.hero-eyebrow', { opacity: 0, y: 8, duration: 0.35, ease: 'power2.out' });
+  gsap.from('.hero-headline', { opacity: 0, y: 12, duration: 0.45, delay: 0.08, ease: 'power2.out' });
+  gsap.from('.hero-subtext', { opacity: 0, y: 10, duration: 0.4, delay: 0.16, ease: 'power2.out' });
+  gsap.from('.role-card', {
     opacity: 0,
-    y: 8,
-    duration: 0.25,
-    stagger: 0.05,
-    delay: 0.2,
+    y: 12,
+    duration: 0.35,
+    stagger: 0.06,
+    delay: 0.24,
     ease: 'power2.out',
     clearProps: 'all'
   });
